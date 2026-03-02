@@ -130,7 +130,7 @@ function renderTemplate(
   data: DocumentDataBinding,
 ): string {
   let rendered = templateContent;
-  const flatData = flattenObject(data as Record<string, unknown>);
+  const flatData = flattenObject(data as unknown as Record<string, unknown>);
 
   for (const [key, value] of Object.entries(flatData)) {
     const placeholder = new RegExp(`\\{\\{\\s*${escapeRegex(key)}\\s*\\}\\}`, 'g');

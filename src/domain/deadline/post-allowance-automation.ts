@@ -14,6 +14,7 @@ import { ulid } from 'ulid';
 import type {
   CaseId,
   TenantId,
+  EventId,
   DeadlineId,
   FeeId,
   ActorId,
@@ -65,7 +66,7 @@ export function generateAllowanceDeadlines(
 
   // Emit DEADLINE_CREATED for issue fee
   events.push({
-    event_id: ulid(),
+    event_id: ulid() as EventId,
     tenant_id: tenantId,
     case_id: caseId,
     event_type: 'DEADLINE_CREATED',
@@ -89,7 +90,7 @@ export function generateAllowanceDeadlines(
 
   // Emit FEE_CREATED for issue fee
   events.push({
-    event_id: ulid(),
+    event_id: ulid() as EventId,
     tenant_id: tenantId,
     case_id: caseId,
     event_type: 'FEE_CREATED',
@@ -141,7 +142,7 @@ export function generateGrantDeadlines(
 
   // Emit DEADLINE_CREATED for first annuity
   events.push({
-    event_id: ulid(),
+    event_id: ulid() as EventId,
     tenant_id: tenantId,
     case_id: caseId,
     event_type: 'DEADLINE_CREATED',
@@ -165,7 +166,7 @@ export function generateGrantDeadlines(
 
   // Emit FEE_CREATED for first annuity
   events.push({
-    event_id: ulid(),
+    event_id: ulid() as EventId,
     tenant_id: tenantId,
     case_id: caseId,
     event_type: 'FEE_CREATED',

@@ -20,6 +20,7 @@ import type {
 import type { EventStore } from '../../infrastructure/event-store/types.js';
 import type {
   CaseId,
+  EventId,
   FeeId,
   DeadlineId,
   CorrelationId,
@@ -50,7 +51,7 @@ export async function feeRoutes(
     const feeId = ulid() as FeeId;
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'FEE_CREATED',
@@ -172,7 +173,7 @@ export async function feeRoutes(
     const feePayload = feeEvent.payload as { fee_type: string; amount: number; currency: string };
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'FEE_PAYMENT_RECORDED',
@@ -232,7 +233,7 @@ export async function feeRoutes(
     const feePayload = feeEvent.payload as { fee_type: string };
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'FEE_WAIVED',

@@ -19,6 +19,7 @@ import type {
 import type { EventStore } from '../../infrastructure/event-store/types.js';
 import type {
   CaseId,
+  EventId,
   DeadlineId,
   FeeId,
   CorrelationId,
@@ -61,7 +62,7 @@ export async function deadlineRoutes(
     };
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'DEADLINE_CREATED',
@@ -146,7 +147,7 @@ export async function deadlineRoutes(
     const causationId = ulid() as CausationId;
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'DEADLINE_COMPLETED',
@@ -211,7 +212,7 @@ export async function deadlineRoutes(
       : (deadlineEvent.payload as DeadlineCreatedPayload).due_date;
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'DEADLINE_EXTENDED',

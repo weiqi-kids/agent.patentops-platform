@@ -23,6 +23,7 @@ import {
 } from '../../workflow/states/oa-response-state-machine.js';
 import type {
   CaseId,
+  EventId,
   OfficeActionId,
   OfficeActionStatus,
   CorrelationId,
@@ -72,7 +73,7 @@ export async function oaRoutes(
     };
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'OA_RECEIVED',
@@ -176,7 +177,7 @@ export async function oaRoutes(
     }
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'OA_CLASSIFIED',
@@ -221,7 +222,7 @@ export async function oaRoutes(
     const causationId = ulid() as CausationId;
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'OA_RESPONSE_FILED',

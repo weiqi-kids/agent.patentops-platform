@@ -20,6 +20,7 @@ import { ConflictChecker } from '../../domain/conflict-check/conflict-checker.js
 import type { ConflictCheckRepository } from '../../domain/conflict-check/conflict-checker.js';
 import type {
   CaseId,
+  EventId,
   ConflictCheckId,
   CorrelationId,
   CausationId,
@@ -52,7 +53,7 @@ export async function conflictRoutes(
 
     // Emit initiation event
     const initiatedEvent: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'CONFLICT_CHECK_INITIATED',
@@ -83,7 +84,7 @@ export async function conflictRoutes(
 
     // Emit completion event
     const completedEvent: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'CONFLICT_CHECK_COMPLETED',
@@ -137,7 +138,7 @@ export async function conflictRoutes(
     const causationId = ulid() as CausationId;
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'CONFLICT_OVERRIDE_APPROVED',

@@ -106,7 +106,7 @@ export async function createApp(deps?: AppDependencies): Promise<FastifyInstance
   }
 
   // ─── Error Handler ────────────────────────────────────────────
-  app.setErrorHandler((error, request, reply) => {
+  app.setErrorHandler((error: Error & { validation?: unknown; statusCode?: number }, request, reply) => {
     request.log.error(error);
 
     if (error.validation) {

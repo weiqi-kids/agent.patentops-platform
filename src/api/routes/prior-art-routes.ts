@@ -12,6 +12,7 @@ import type { AddPriorArtInput } from '../schemas/prior-art-schemas.js';
 import type { EventStore } from '../../infrastructure/event-store/types.js';
 import type {
   CaseId,
+  EventId,
   CorrelationId,
   CausationId,
 } from '../../shared/types/index.js';
@@ -40,7 +41,7 @@ export async function priorArtRoutes(
     const referenceId = ulid();
 
     const event: DomainEvent = {
-      event_id: ulid(),
+      event_id: ulid() as EventId,
       tenant_id: request.tenant_id,
       case_id: caseId,
       event_type: 'PRIOR_ART_REFERENCE_ADDED',

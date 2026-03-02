@@ -37,9 +37,9 @@ declare module 'fastify' {
 // ─── Auth Plugin ───────────────────────────────────────────────────
 
 async function authPluginImpl(fastify: FastifyInstance): Promise<void> {
-  fastify.decorateRequest('tenant_id', '');
-  fastify.decorateRequest('actor_id', '');
-  fastify.decorateRequest('actor_role', '');
+  fastify.decorateRequest('tenant_id', '' as TenantId);
+  fastify.decorateRequest('actor_id', '' as ActorId);
+  fastify.decorateRequest('actor_role', '' as ActorRole);
 
   fastify.addHook('onRequest', async (request: FastifyRequest, reply: FastifyReply) => {
     // Skip auth for health check
