@@ -19,28 +19,29 @@
     "pm2:logs": "pm2 logs patentops-api"
   },
   "dependencies": {
-    "fastify": "^5.2.0",
     "@fastify/cors": "^10.0.0",
     "@fastify/jwt": "^9.0.0",
     "@fastify/swagger": "^9.0.0",
-    "ulid": "^2.3.0",
-    "zod": "^3.24.0",
-    "pg": "^8.13.0",
-    "drizzle-orm": "^0.38.0",
-    "ioredis": "^5.4.0",
     "bullmq": "^5.30.0",
-    "pino": "^9.6.0",
     "dayjs": "^1.11.0",
+    "drizzle-orm": "^0.38.0",
+    "fastify": "^5.2.0",
+    "fastify-plugin": "^5.1.0",
+    "handlebars": "^4.7.0",
+    "ioredis": "^5.4.0",
     "node-cron": "^3.0.0",
-    "handlebars": "^4.7.0"
+    "pg": "^8.13.0",
+    "pino": "^9.6.0",
+    "ulid": "^2.3.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0",
-    "tsx": "^4.19.0",
-    "vitest": "^3.0.0",
-    "eslint": "^9.0.0",
     "@types/node": "^22.0.0",
     "@types/pg": "^8.11.0",
-    "drizzle-kit": "^0.30.0"
+    "drizzle-kit": "^0.30.0",
+    "eslint": "^9.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
   }
 }

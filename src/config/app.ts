@@ -11,10 +11,16 @@ import fastifyCors from '@fastify/cors';
 import { ulid } from 'ulid';
 import { authPlugin } from '../api/middleware/auth.js';
 import { caseRoutes } from '../api/routes/case-routes.js';
+import { claimRoutes } from '../api/routes/claim-routes.js';
+import { oaRoutes } from '../api/routes/oa-routes.js';
+import { deadlineRoutes } from '../api/routes/deadline-routes.js';
+import { conflictRoutes } from '../api/routes/conflict-routes.js';
 import type { EventStore } from '../infrastructure/event-store/types.js';
+import type { ConflictCheckRepository } from '../domain/conflict-check/conflict-checker.js';
 
 export interface AppDependencies {
   eventStore: EventStore;
+  conflictRepository?: ConflictCheckRepository;
 }
 
 export async function createApp(deps?: AppDependencies): Promise<FastifyInstance> {
@@ -56,6 +62,29 @@ export async function createApp(deps?: AppDependencies): Promise<FastifyInstance
       prefix: '/api/v1',
       eventStore: deps.eventStore,
     });
+
+    await app.register(claimRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+
+    await app.register(oaRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+
+    await app.register(deadlineRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+
+    if (deps.conflictRepository) {
+      await app.register(conflictRoutes, {
+        prefix: '/api/v1',
+        eventStore: deps.eventStore,
+        conflictRepository: deps.conflictRepository,
+      });
+    }
   }
 
   // ─── Error Handler ────────────────────────────────────────────

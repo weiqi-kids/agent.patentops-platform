@@ -9,6 +9,7 @@
  */
 
 import type { FastifyRequest, FastifyReply, FastifyInstance } from 'fastify';
+import fp from 'fastify-plugin';
 import type { TenantId, ActorId, ActorRole } from '../../shared/types/index.js';
 
 // ─── JWT Payload Shape ─────────────────────────────────────────────
@@ -35,7 +36,7 @@ declare module 'fastify' {
 
 // ─── Auth Plugin ───────────────────────────────────────────────────
 
-export async function authPlugin(fastify: FastifyInstance): Promise<void> {
+async function authPluginImpl(fastify: FastifyInstance): Promise<void> {
   fastify.decorateRequest('tenant_id', '');
   fastify.decorateRequest('actor_id', '');
   fastify.decorateRequest('actor_role', '');
@@ -63,6 +64,8 @@ export async function authPlugin(fastify: FastifyInstance): Promise<void> {
     }
   });
 }
+
+export const authPlugin = fp(authPluginImpl, { name: 'auth-plugin' });
 
 // ─── Role Guard ────────────────────────────────────────────────────
 
