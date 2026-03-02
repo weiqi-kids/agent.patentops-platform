@@ -15,6 +15,8 @@ import { claimRoutes } from '../api/routes/claim-routes.js';
 import { oaRoutes } from '../api/routes/oa-routes.js';
 import { deadlineRoutes } from '../api/routes/deadline-routes.js';
 import { conflictRoutes } from '../api/routes/conflict-routes.js';
+import { feeRoutes } from '../api/routes/fee-routes.js';
+import { priorArtRoutes } from '../api/routes/prior-art-routes.js';
 import type { EventStore } from '../infrastructure/event-store/types.js';
 import type { ConflictCheckRepository } from '../domain/conflict-check/conflict-checker.js';
 
@@ -74,6 +76,16 @@ export async function createApp(deps?: AppDependencies): Promise<FastifyInstance
     });
 
     await app.register(deadlineRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+
+    await app.register(feeRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+
+    await app.register(priorArtRoutes, {
       prefix: '/api/v1',
       eventStore: deps.eventStore,
     });
