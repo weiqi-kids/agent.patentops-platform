@@ -2,7 +2,7 @@
  * Deadline Engine — Core Logic
  *
  * Responsibilities:
- * 1. Calculate statutory deadlines from OA dates (jurisdiction-specific)
+ * 1. Calculate statutory deadlines (jurisdiction-specific rules injected)
  * 2. Perform periodic sweep checks on all active deadlines
  * 3. Trigger escalation notifications at defined thresholds
  * 4. Create incident records for missed deadlines
@@ -11,13 +11,17 @@
  * This module emits events but does NOT directly send notifications.
  * Notification delivery is handled by a separate notification service
  * that subscribes to deadline events.
+ *
+ * CRITICAL: Deadline start date depends on jurisdiction.
+ *   - Some jurisdictions use mailing_date (e.g., US — date on the OA)
+ *   - Some use received_date or constructive service date (e.g., TW — 發文日 + 推定送達日數)
+ *   The JurisdictionDeadlineRule.start_date_basis controls this.
  */
 
 import type { DeadlineId, CaseId, TenantId, ActorId } from '../../shared/types/index.js';
 import type {
   DeadlineCalculationInput,
   DeadlineCalculationResult,
-  DeadlineSweepResult,
   EscalationRule,
   JurisdictionDeadlineRule,
 } from './types.js';
@@ -40,7 +44,7 @@ export interface ActiveDeadlineRecord {
   case_id: CaseId;
   tenant_id: TenantId;
   deadline_type: 'statutory' | 'procedural' | 'internal';
-  source_entity_type: 'case' | 'office_action' | 'maintenance';
+  source_entity_type: 'case' | 'office_action' | 'fee' | 'examination_request' | 'priority_claim';
   source_entity_id: string;
   due_date: string;
   escalation_level: number;
@@ -53,6 +57,39 @@ export type DeadlineEvent =
   | { type: 'DEADLINE_ESCALATED'; deadline_id: DeadlineId; from_level: number; to_level: number }
   | { type: 'DEADLINE_MISSED'; deadline_id: DeadlineId; missed_at: string };
 
+// ─── Start Date Resolution ─────────────────────────────────────────
+
+/**
+ * Determine the start date for deadline calculation based on
+ * jurisdiction rules.
+ *
+ * Different jurisdictions use different bases:
+ * - US: mailing_date (date printed on the OA)
+ * - TW: mailing_date + service_date_offset_days (constructive service)
+ * - EP: received_date (date of actual receipt)
+ */
+export function resolveStartDate(
+  input: DeadlineCalculationInput,
+  rule: JurisdictionDeadlineRule,
+): Date {
+  let baseDate: Date;
+
+  switch (rule.start_date_basis) {
+    case 'mailing_date':
+      baseDate = new Date(input.mailing_date);
+      break;
+    case 'received_date':
+      baseDate = new Date(input.received_date);
+      break;
+    case 'service_date':
+      baseDate = new Date(input.mailing_date);
+      baseDate.setDate(baseDate.getDate() + rule.service_date_offset_days);
+      break;
+  }
+
+  return baseDate;
+}
+
 // ─── Deadline Calculator ───────────────────────────────────────────
 
 export function calculateDeadline(
@@ -60,21 +97,21 @@ export function calculateDeadline(
   rules: JurisdictionDeadlineRule[],
 ): DeadlineCalculationResult | null {
   const rule = rules.find(
-    (r) => r.jurisdiction === input.jurisdiction && r.oa_type === input.oa_type,
+    (r) => r.jurisdiction === input.jurisdiction && r.trigger_type === input.trigger_type,
   );
 
   if (!rule) {
     return null;
   }
 
-  const receivedDate = new Date(input.received_date);
+  const startDate = resolveStartDate(input, rule);
 
   // Calculate base due date
-  const baseDueDate = new Date(receivedDate);
+  const baseDueDate = new Date(startDate);
   baseDueDate.setMonth(baseDueDate.getMonth() + rule.base_response_period_months);
 
   // Calculate current due date with extensions
-  const currentDueDate = new Date(receivedDate);
+  const currentDueDate = new Date(startDate);
   const totalMonths =
     rule.base_response_period_months +
     input.extensions_used * rule.extension_period_months;
@@ -87,7 +124,7 @@ export function calculateDeadline(
   if (extensionsRemaining > 0) {
     const nextDate = new Date(currentDueDate);
     nextDate.setMonth(nextDate.getMonth() + rule.extension_period_months);
-    const absoluteMax = new Date(receivedDate);
+    const absoluteMax = new Date(startDate);
     absoluteMax.setMonth(absoluteMax.getMonth() + rule.absolute_max_months);
     if (nextDate <= absoluteMax) {
       nextExtensionDueDate = nextDate.toISOString();
@@ -95,11 +132,13 @@ export function calculateDeadline(
   }
 
   return {
+    start_date: startDate.toISOString(),
     base_due_date: baseDueDate.toISOString(),
     current_due_date: currentDueDate.toISOString(),
     extensions_remaining: extensionsRemaining,
     next_extension_due_date: nextExtensionDueDate,
     requires_fee: rule.extension_requires_fee,
+    rule_reference: rule.rule_reference,
   };
 }
 

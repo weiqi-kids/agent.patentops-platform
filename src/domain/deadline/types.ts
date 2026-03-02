@@ -3,6 +3,8 @@
  *
  * The most critical operational module in PatentOps.
  * A missed patent deadline can result in irrecoverable loss of patent rights.
+ *
+ * Jurisdiction-agnostic: deadline rules are injected by jurisdiction plugins.
  */
 
 import type {
@@ -77,72 +79,44 @@ export const DEFAULT_ESCALATION_RULES: EscalationRule[] = [
   },
 ];
 
-// ─── Jurisdiction-Specific Deadline Rules ──────────────────────────
+// ─── Jurisdiction Deadline Rules ────────────────────────────────────
+// Jurisdiction plugins provide these rules. Core platform defines the interface.
 
 export interface JurisdictionDeadlineRule {
   jurisdiction: string;
-  oa_type: string;
+  /** OA category or deadline trigger type */
+  trigger_type: string;
   base_response_period_months: number;
   max_extensions: number;
   extension_period_months: number;
   extension_requires_fee: boolean;
   absolute_max_months: number;
-  /** Statutory/regulatory source for this rule (e.g., "37 CFR 1.111", "MPEP 710.02(e)") */
+  /** How to determine the start date for this jurisdiction */
+  start_date_basis: 'mailing_date' | 'received_date' | 'service_date';
+  /** Optional: days to add for constructive service (e.g., TW adds days for delivery) */
+  service_date_offset_days: number;
+  /** Statutory/regulatory source */
   rule_reference: string;
 }
-
-/**
- * Example rules for USPTO (US jurisdiction).
- * Each jurisdiction project will define its own rules.
- */
-export const USPTO_DEADLINE_RULES: JurisdictionDeadlineRule[] = [
-  {
-    jurisdiction: 'US',
-    oa_type: 'non_final',
-    base_response_period_months: 3,
-    max_extensions: 3,
-    extension_period_months: 1,
-    extension_requires_fee: true,
-    absolute_max_months: 6,
-    rule_reference: '37 CFR 1.111; MPEP 710.02(e)',
-  },
-  {
-    jurisdiction: 'US',
-    oa_type: 'final',
-    base_response_period_months: 3,
-    max_extensions: 3,
-    extension_period_months: 1,
-    extension_requires_fee: true,
-    absolute_max_months: 6,
-    rule_reference: '37 CFR 1.113; MPEP 706.07(a)',
-  },
-  {
-    jurisdiction: 'US',
-    oa_type: 'restriction',
-    base_response_period_months: 3,
-    max_extensions: 3,
-    extension_period_months: 1,
-    extension_requires_fee: true,
-    absolute_max_months: 6,
-    rule_reference: '37 CFR 1.142; MPEP 818',
-  },
-];
 
 // ─── Deadline Calculation Interface ────────────────────────────────
 
 export interface DeadlineCalculationInput {
   jurisdiction: string;
-  oa_type: string;
-  received_date: string; // ISO 8601
+  trigger_type: string;
+  mailing_date: string;
+  received_date: string;
   extensions_used: number;
 }
 
 export interface DeadlineCalculationResult {
+  start_date: string;
   base_due_date: string;
   current_due_date: string;
   extensions_remaining: number;
   next_extension_due_date: string | null;
   requires_fee: boolean;
+  rule_reference: string;
 }
 
 // ─── Deadline Sweep Result ─────────────────────────────────────────

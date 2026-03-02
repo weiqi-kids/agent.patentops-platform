@@ -6,8 +6,18 @@
  */
 
 import Fastify, { type FastifyInstance } from 'fastify';
+import fastifyJwt from '@fastify/jwt';
+import fastifyCors from '@fastify/cors';
+import { ulid } from 'ulid';
+import { authPlugin } from '../api/middleware/auth.js';
+import { caseRoutes } from '../api/routes/case-routes.js';
+import type { EventStore } from '../infrastructure/event-store/types.js';
 
-export async function createApp(): Promise<FastifyInstance> {
+export interface AppDependencies {
+  eventStore: EventStore;
+}
+
+export async function createApp(deps?: AppDependencies): Promise<FastifyInstance> {
   const app = Fastify({
     logger: {
       level: process.env['LOG_LEVEL'] ?? 'info',
@@ -16,13 +26,22 @@ export async function createApp(): Promise<FastifyInstance> {
           ? { target: 'pino-pretty' }
           : undefined,
     },
-    genReqId: () => {
-      // Use ULID for request IDs (to be replaced with actual ULID generation)
-      return `req_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-    },
+    genReqId: () => ulid(),
   });
 
-  // Health check route
+  // ─── Plugins ──────────────────────────────────────────────────
+  await app.register(fastifyCors, {
+    origin: process.env['CORS_ORIGIN'] ?? '*',
+  });
+
+  await app.register(fastifyJwt, {
+    secret: process.env['JWT_SECRET'] ?? 'dev-secret-change-in-production',
+  });
+
+  // ─── Auth Middleware ──────────────────────────────────────────
+  await app.register(authPlugin);
+
+  // ─── Health Check (unauthenticated) ───────────────────────────
   app.get('/health', async () => {
     return {
       status: 'ok',
@@ -31,10 +50,29 @@ export async function createApp(): Promise<FastifyInstance> {
     };
   });
 
-  // TODO: Register plugins (CORS, JWT, Swagger)
-  // TODO: Register tenant middleware
-  // TODO: Register API routes
-  // TODO: Register error handlers
+  // ─── API Routes ───────────────────────────────────────────────
+  if (deps?.eventStore) {
+    await app.register(caseRoutes, {
+      prefix: '/api/v1',
+      eventStore: deps.eventStore,
+    });
+  }
+
+  // ─── Error Handler ────────────────────────────────────────────
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(error);
+
+    if (error.validation) {
+      return reply.status(400).send({
+        error: 'Validation error',
+        details: error.validation,
+      });
+    }
+
+    return reply.status(error.statusCode ?? 500).send({
+      error: error.message ?? 'Internal server error',
+    });
+  });
 
   return app;
 }

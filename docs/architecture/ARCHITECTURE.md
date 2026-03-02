@@ -89,11 +89,10 @@ This ensures every AI output passes through a human checkpoint before becoming p
                     ┌─────────────┐
                     │   INTAKE    │
                     └──────┬──────┘
-                           │ case_accepted
+                           │ case_accepted (conflict check required)
                     ┌──────▼──────┐
               ┌─────│  DRAFTING   │─────┐
               │     └──────┬──────┘     │
-              │            │ draft_     │ case_
               │            │ submitted  │ withdrawn
               │     ┌──────▼──────┐     │
               │     │  REVIEW     │     │
@@ -104,20 +103,27 @@ This ensures every AI output passes through a human checkpoint before becoming p
               │     └──────┬──────┘     │
               │            │ filed      │
               │     ┌──────▼──────┐     │
-              │     │  PENDING    │◄────┤
+              │     │   FILED     │◄────┤
               │     └──────┬──────┘     │
-              │            │            │
-              │     ┌──────▼──────┐     │
-              │     │  OA_RECEIVED│     │
-              │     └──────┬──────┘     │
-              │            │ response_  │
-              │            │ filed      │
-              │     ┌──────▼──────┐     │
-              │     │  PENDING    │     │ (loop)
-              │     └──────┬──────┘     │
-              │            │ granted    │
-              │     ┌──────▼──────┐     │
-              └────►│  CLOSED     │◄────┘
+              │       │         │       │
+              │       │    ┌────▼─────────────────┐
+              │       │    │EXAMINATION_REQUESTED  │ (TW/EP/JP)
+              │       │    └────┬─────────────────┘
+              │       │         │
+              │     ┌─▼─────────▼┐
+              │     │ OA_RECEIVED │ ←── (can loop: FILED ↔ OA_RECEIVED)
+              │     └──────┬─────┘
+              │            │ allowed
+              │     ┌──────▼──────┐
+              │     │  ALLOWED    │ ← Notice of allowance / 核准審定
+              │     └──────┬──────┘
+              │            │ issue fee paid
+              │     ┌──────▼──────┐
+              │     │  GRANTED    │ ← Patent issued, maintenance phase
+              │     └──────┬──────┘
+              │            │ lapsed/expired
+              │     ┌──────▼──────┐
+              └────►│  CLOSED     │
                     └─────────────┘
 ```
 
@@ -126,37 +132,61 @@ States:
 - `DRAFTING` — Claims and specification being drafted
 - `REVIEW` — Human review of draft (mandatory checkpoint)
 - `FILING` — Approved for filing, document generation in progress
-- `PENDING` — Filed with patent office, awaiting response
+- `FILED` — Filed with patent office, awaiting examination
+- `EXAMINATION_REQUESTED` — Substantive examination requested (TW/EP/JP — some jurisdictions require separate request)
 - `OA_RECEIVED` — Office Action received, response workflow triggered
-- `CLOSED` — Case granted, withdrawn, or abandoned
+- `ALLOWED` — Notice of allowance received, awaiting issue fee payment
+- `GRANTED` — Patent issued, maintenance/annuity phase active
+- `CLOSED` — Case terminated (abandoned, withdrawn, rejected, lapsed, expired)
 
-### 4.2 Office Action Response Workflow
+### 4.2 Jurisdiction-Agnostic Design
+
+This core platform uses **generic OA categories** and **generic rejection bases** that map to jurisdiction-specific terminology:
+
+| Generic Category | US | TW | EP |
+|-----------------|-----|-----|-----|
+| `substantive_rejection` | Non-final OA | 審查意見通知 | Communication under Art. 94(3) |
+| `final_rejection` | Final OA | 核駁審定 | Decision to refuse |
+| `restriction` | Restriction requirement | 限制要求 | Unity objection |
+| `allowance` | Notice of Allowance | 核准審定 | Decision to grant |
+
+Each jurisdiction plugin provides:
+- OA type mappings
+- Rejection basis mappings (e.g., `novelty` → `35 USC §102` or `專利法§22-I-1`)
+- Deadline rules (with jurisdiction-specific start date basis)
+- Fee schedules and annuity rules
+
+### 4.3 Office Action Response Sub-Workflow
+
+Each OfficeAction entity has its own lifecycle, independent of the case-level state machine. A case may have multiple OAs progressing through this workflow concurrently.
 
 ```
 ┌──────────────┐
-│  OA_RECEIVED │
+│  received    │
 └──────┬───────┘
-       │ oa_classified
+       │ start analysis (or skip → amending for simple OAs)
 ┌──────▼───────┐
-│  ANALYZING   │ ← AI Sidecar: classify rejection, map cited art
+│  analyzing   │ ← AI Sidecar: classify rejection, map cited art
 └──────┬───────┘
-       │ analysis_complete
+       │ analysis complete
 ┌──────▼───────┐
-│  STRATEGIZING│ ← AI Sidecar: suggest amendment strategies
+│ strategizing │ ← AI Sidecar: suggest amendment strategies
 └──────┬───────┘
-       │ strategy_selected
+       │ strategy selected
 ┌──────▼───────┐
-│  AMENDING    │ ← Attorney drafts amendments (AI-assisted)
+│  amending    │ ← Attorney drafts amendments (AI-assisted)
 └──────┬───────┘
-       │ amendment_reviewed
+       │ submitted for review
 ┌──────▼───────┐
-│  OA_REVIEW   │ ← Mandatory human review checkpoint
-└──────┬───────┘
+│   review     │ ← Mandatory human review checkpoint
+└──────┬───────┘  (can send back to amending)
        │ approved
 ┌──────▼───────┐
-│  OA_FILING   │ ← Generate response document, file
+│   filed      │ ← Response filed with patent office
 └──────────────┘
 ```
+
+**Implemented in:** `src/workflow/states/oa-response-state-machine.ts`
 
 ---
 

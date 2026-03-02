@@ -3,6 +3,10 @@
  *
  * These types are the foundation of the entire system.
  * Every module depends on these definitions.
+ *
+ * IMPORTANT: This is the CORE platform. Types here must be
+ * jurisdiction-agnostic. Jurisdiction-specific values (e.g., US §102,
+ * TW §22) belong in jurisdiction plugin projects.
  */
 
 // ─── Branded ID Types ────────────────────────────────────────────────
@@ -21,7 +25,6 @@ export type CorrelationId = string & { readonly __brand: 'CorrelationId' };
 export type CausationId = string & { readonly __brand: 'CausationId' };
 export type PatentFamilyId = string & { readonly __brand: 'PatentFamilyId' };
 export type FeeId = string & { readonly __brand: 'FeeId' };
-export type IdsId = string & { readonly __brand: 'IdsId' };
 
 // ─── Actor & Roles ──────────────────────────────────────────────────
 
@@ -46,6 +49,7 @@ export interface Actor {
   name: string;
   role: ActorRole;
   license_number: string | null;
+  jurisdiction: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -59,28 +63,45 @@ export interface Tenant {
   tenant_id: TenantId;
   name: string;
   plan_tier: PlanTier;
+  default_jurisdiction: string;
   settings: Record<string, unknown>;
   created_at: string;
 }
 
+// ─── Patent Type ────────────────────────────────────────────────────
+// Universal patent types across jurisdictions.
+
+export const PATENT_TYPES = [
+  'invention',       // 發明 (TW), Utility Patent (US), Patent (EP)
+  'utility_model',   // 新型 (TW), Gebrauchsmuster (DE), not available in US
+  'design',          // 設計 (TW), Design Patent (US), Registered Design (EP)
+] as const;
+
+export type PatentType = (typeof PATENT_TYPES)[number];
+
 // ─── Case ───────────────────────────────────────────────────────────
 
 export const CASE_STATUSES = [
-  'INTAKE',
-  'DRAFTING',
-  'REVIEW',
-  'FILING',
-  'PENDING',
-  'OA_RECEIVED',
-  'CLOSED',
+  'INTAKE',                // Case received, conflict check pending
+  'DRAFTING',              // Application being drafted
+  'REVIEW',                // Internal review
+  'FILING',                // Approved, filing package being prepared
+  'FILED',                 // Submitted to patent office, awaiting examination
+  'EXAMINATION_REQUESTED', // Substantive examination requested (TW/EP/JP)
+  'OA_RECEIVED',           // Office action received, response workflow active
+  'ALLOWED',               // Notice of allowance / 核准審定
+  'GRANTED',               // Patent issued / 公告, maintenance phase active
+  'CLOSED',                // Terminated (abandoned, withdrawn, rejected, expired, lapsed)
 ] as const;
 
 export type CaseStatus = (typeof CASE_STATUSES)[number];
 
 export const CASE_CLOSE_REASONS = [
-  'granted',
-  'withdrawn',
-  'abandoned',
+  'abandoned',           // Applicant chose not to continue
+  'withdrawn',           // Applicant withdrew before examination
+  'rejected',            // Final rejection upheld, appeal exhausted
+  'lapsed',              // Failed to pay annuity/maintenance fee
+  'expired',             // Patent term expired naturally
 ] as const;
 
 export type CaseCloseReason = (typeof CASE_CLOSE_REASONS)[number];
@@ -89,6 +110,7 @@ export interface PatentCase {
   case_id: CaseId;
   tenant_id: TenantId;
   case_number: string | null;
+  patent_type: PatentType;
   title: string;
   status: CaseStatus;
   applicant_id: ActorId;
@@ -100,6 +122,10 @@ export interface PatentCase {
   jurisdiction: string;
   filing_date: string | null;
   priority_date: string | null;
+  application_number: string | null;
+  patent_number: string | null;
+  grant_date: string | null;
+  examination_requested_date: string | null;
   parent_case_id: CaseId | null;
   family_id: PatentFamilyId | null;
   current_version: number;
@@ -111,6 +137,15 @@ export interface PatentCase {
 
 export const CLAIM_TYPES = ['independent', 'dependent'] as const;
 export type ClaimType = (typeof CLAIM_TYPES)[number];
+
+export const CLAIM_CATEGORIES = [
+  'method',
+  'apparatus',
+  'system',
+  'composition',
+  'use',
+] as const;
+export type ClaimCategory = (typeof CLAIM_CATEGORIES)[number];
 
 export const CLAIM_STATUSES = [
   'draft',
@@ -129,6 +164,7 @@ export interface Claim {
   version: number;
   claim_number: number;
   claim_type: ClaimType;
+  claim_category: ClaimCategory | null;
   depends_on_claim_id: ClaimId | null;
   claim_text: string;
   status: ClaimStatus;
@@ -139,18 +175,40 @@ export interface Claim {
 }
 
 // ─── Office Action ──────────────────────────────────────────────────
+// Generic OA categories that map to jurisdiction-specific terminology.
+// Examples:
+//   'substantive_rejection' → US non-final OA, TW 審查意見通知
+//   'final_rejection'       → US final OA, TW 核駁審定
+//   'restriction'           → US restriction requirement, TW 限制
+//   'search_report'         → EP search report, TW 檢索報告
+//   'allowance'             → US notice of allowance, TW 核准審定
 
-export const OA_TYPES = [
-  'non_final',
-  'final',
+export const OA_CATEGORIES = [
+  'substantive_rejection',
+  'final_rejection',
   'restriction',
   'advisory',
+  'search_report',
+  'allowance',
 ] as const;
 
-export type OfficeActionType = (typeof OA_TYPES)[number];
+export type OfficeActionCategory = (typeof OA_CATEGORIES)[number];
 
-export const REJECTION_TYPES = ['102', '103', '112', 'other'] as const;
-export type RejectionType = (typeof REJECTION_TYPES)[number];
+// Generic rejection bases that map to jurisdiction-specific statutes.
+// Jurisdiction plugins provide the mapping (e.g., 'novelty' → 'TW §22-I-1' or 'US §102').
+export const REJECTION_BASES = [
+  'novelty',                  // US §102, TW §22-I-1
+  'inventive_step',           // US §103, TW §22-II
+  'clarity',                  // US §112, TW §26
+  'industrial_applicability', // TW §22-I, EP Art.57
+  'patent_eligibility',       // US §101
+  'new_matter',               // US §132, TW §67
+  'double_patenting',         // US, TW §31
+  'unity_of_invention',       // TW §33, EP Rule 44
+  'other',
+] as const;
+
+export type RejectionBasis = (typeof REJECTION_BASES)[number];
 
 export const OA_STATUSES = [
   'received',
@@ -178,14 +236,20 @@ export interface OfficeAction {
   oa_id: OfficeActionId;
   case_id: CaseId;
   tenant_id: TenantId;
-  oa_type: OfficeActionType;
+  oa_category: OfficeActionCategory;
+  /** Jurisdiction-specific OA type label (e.g., "non_final", "審查意見通知") */
+  oa_type_label: string;
+  mailing_date: string;
   received_date: string;
   response_deadline: string;
   extended_deadline: string | null;
   cited_references: CitedReference[];
-  rejection_type: RejectionType;
+  rejection_bases: RejectionBasis[];
+  /** Jurisdiction-specific statutory references (e.g., ["35 USC §102", "35 USC §103"]) */
+  statutory_references: string[];
   status: OfficeActionStatus;
   risk_rating: RiskRating | null;
+  sequence_number: number;
   created_at: string;
 }
 
@@ -202,8 +266,9 @@ export type DeadlineType = (typeof DEADLINE_TYPES)[number];
 export const DEADLINE_SOURCE_ENTITY_TYPES = [
   'case',
   'office_action',
-  'maintenance',
   'fee',
+  'examination_request',
+  'priority_claim',
 ] as const;
 
 export type DeadlineSourceEntityType =
@@ -229,6 +294,8 @@ export interface Deadline {
   source_entity_type: DeadlineSourceEntityType;
   source_entity_id: string;
   due_date: string;
+  /** Statutory/regulatory source for this deadline */
+  rule_reference: string | null;
   warning_sent_at: string[];
   escalation_level: EscalationLevel;
   status: DeadlineStatus;
@@ -262,8 +329,11 @@ export const DOCUMENT_TYPES = [
   'application',
   'response',
   'amendment',
-  'ids',
   'declaration',
+  'power_of_attorney',
+  'ids',                 // US-specific: Information Disclosure Statement
+  'search_report',
+  'fee_receipt',
 ] as const;
 
 export type DocumentType = (typeof DOCUMENT_TYPES)[number];
@@ -277,7 +347,7 @@ export interface Document {
   tenant_id: TenantId;
   document_type: DocumentType;
   version: number;
-  template_id: string;
+  template_id: string | null;
   content_hash: string;
   status: DocumentStatus;
   generated_at: string;
@@ -310,18 +380,19 @@ export interface PatentFamilyLink {
 }
 
 // ─── Fee Tracking ──────────────────────────────────────────────────
+// Generic fee types. Jurisdiction plugins define fee schedules and amounts.
 
 export const FEE_TYPES = [
-  'filing_fee',
-  'search_fee',
-  'examination_fee',
-  'issue_fee',
-  'maintenance_3_5_year',
-  'maintenance_7_5_year',
-  'maintenance_11_5_year',
-  'extension_fee',
-  'petition_fee',
-  'foreign_filing_fee',
+  'filing',
+  'search',
+  'examination',
+  'issue',             // Certificate fee / 證書費
+  'annuity',           // Annual/maintenance fee — generic for all jurisdictions
+  'extension',
+  'petition',
+  'foreign_filing',
+  'late_surcharge',
+  'reexamination',
 ] as const;
 
 export type FeeType = (typeof FEE_TYPES)[number];
@@ -340,9 +411,13 @@ export interface Fee {
   case_id: CaseId;
   tenant_id: TenantId;
   fee_type: FeeType;
+  /** Jurisdiction-specific fee label (e.g., "3.5-year maintenance", "第3年年費") */
+  fee_label: string;
   amount: number;
   currency: string;
   due_date: string;
+  grace_period_end: string | null;
+  late_surcharge_amount: number | null;
   status: FeeStatus;
   paid_at: string | null;
   payment_reference: string | null;
@@ -350,39 +425,24 @@ export interface Fee {
   created_at: string;
 }
 
-// ─── IDS (Information Disclosure Statement) ────────────────────────
+// ─── Prior Art Reference ────────────────────────────────────────────
+// Jurisdiction-agnostic prior art tracking.
+// IDS (Information Disclosure Statement) is US-specific and handled
+// by the US jurisdiction plugin. Core platform tracks references generically.
 
-export const IDS_STATUSES = [
-  'draft',
-  'pending_review',
-  'approved',
-  'filed',
-] as const;
-
-export type IdsStatus = (typeof IDS_STATUSES)[number];
-
-export interface IdsRecord {
-  ids_id: IdsId;
+export interface PriorArtReference {
+  reference_id: string;
   case_id: CaseId;
   tenant_id: TenantId;
-  references: IdsReference[];
-  status: IdsStatus;
-  filed_date: string | null;
-  document_id: DocumentId | null;
-  created_at: string;
-}
-
-export interface IdsReference {
-  reference_id: string;
-  reference_type: 'us_patent' | 'us_publication' | 'foreign' | 'npl';
+  reference_type: 'patent' | 'publication' | 'npl';
   document_number: string;
   title: string;
-  inventor: string;
-  publication_date: string;
+  inventor: string | null;
+  publication_date: string | null;
+  jurisdiction: string | null;
   source: 'oa_citation' | 'applicant_disclosure' | 'search_result';
   added_at: string;
   added_by_actor_id: ActorId;
-  covered_by_ids_id: IdsId | null;
 }
 
 // ─── AI Draft Marker ───────────────────────────────────────────────

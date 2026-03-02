@@ -3,6 +3,8 @@
  *
  * All events are immutable, append-only records.
  * Events are the single source of truth. All database tables are projections.
+ *
+ * Jurisdiction-agnostic: no US/TW/EP-specific event types here.
  */
 
 import type {
@@ -14,14 +16,17 @@ import type {
   CausationId,
   ActorRole,
   CaseStatus,
+  CaseCloseReason,
+  PatentType,
   ClaimId,
   ClaimStatus,
+  ClaimCategory,
   OfficeActionId,
   OfficeActionStatus,
-  RejectionType,
+  OfficeActionCategory,
+  RejectionBasis,
   RiskRating,
   DeadlineId,
-  DeadlineStatus,
   EscalationLevel,
   ConflictCheckId,
   ConflictResult,
@@ -33,9 +38,6 @@ import type {
   FamilyRelationshipType,
   FeeId,
   FeeType,
-  FeeStatus,
-  IdsId,
-  IdsStatus,
 } from '../types/index.js';
 
 // ─── Event Type Registry ────────────────────────────────────────────
@@ -43,10 +45,12 @@ import type {
 export const EVENT_TYPES = [
   // Case lifecycle
   'CASE_CREATED',
-  'CASE_ACCEPTED',
   'CASE_STATUS_CHANGED',
-  'CASE_WITHDRAWN',
   'CASE_CLOSED',
+  'EXAMINATION_REQUESTED',
+  'FILING_RECEIPT_RECORDED',
+  'ALLOWANCE_RECEIVED',
+  'PATENT_GRANTED',
 
   // Claim management
   'CLAIM_CREATED',
@@ -93,18 +97,14 @@ export const EVENT_TYPES = [
   'PRIORITY_CLAIM_RECORDED',
 
   // Fee tracking
-  'FEE_DEADLINE_CREATED',
+  'FEE_CREATED',
   'FEE_PAYMENT_RECORDED',
   'FEE_WAIVED',
 
-  // IDS (Information Disclosure Statement) / Duty of Candor
+  // Prior art (jurisdiction-agnostic)
   'PRIOR_ART_REFERENCE_ADDED',
-  'IDS_DRAFTED',
-  'IDS_APPROVED',
-  'IDS_FILED',
-  'IDS_COVERAGE_WARNING',
 
-  // Inventor declarations
+  // Declarations
   'DECLARATION_REQUESTED',
   'DECLARATION_SIGNED',
 
@@ -137,10 +137,13 @@ export interface BaseEvent<T extends EventType, P> {
 
 export interface CaseCreatedPayload {
   title: string;
+  patent_type: PatentType;
   applicant_id: ActorId;
+  inventor_ids: ActorId[];
   assigned_attorney_id: ActorId;
   jurisdiction: string;
   priority_date: string | null;
+  parent_case_id: CaseId | null;
 }
 
 export interface CaseStatusChangedPayload {
@@ -149,15 +152,31 @@ export interface CaseStatusChangedPayload {
   reason: string | null;
 }
 
+export interface FilingReceiptPayload {
+  application_number: string;
+  filing_date: string;
+  filing_reference: string | null;
+}
+
+export interface AllowanceReceivedPayload {
+  allowance_date: string;
+  issue_fee_due_date: string;
+  conditions: string | null;
+}
+
+export interface PatentGrantedPayload {
+  patent_number: string;
+  grant_date: string;
+  first_annuity_due_date: string | null;
+}
+
 export type CaseCreatedEvent = BaseEvent<'CASE_CREATED', CaseCreatedPayload>;
-export type CaseStatusChangedEvent = BaseEvent<
-  'CASE_STATUS_CHANGED',
-  CaseStatusChangedPayload
->;
-export type CaseClosedEvent = BaseEvent<
-  'CASE_CLOSED',
-  { from_state: CaseStatus; close_reason: string }
->;
+export type CaseStatusChangedEvent = BaseEvent<'CASE_STATUS_CHANGED', CaseStatusChangedPayload>;
+export type CaseClosedEvent = BaseEvent<'CASE_CLOSED', { from_state: CaseStatus; close_reason: CaseCloseReason }>;
+export type ExaminationRequestedEvent = BaseEvent<'EXAMINATION_REQUESTED', { requested_date: string; deadline_id: DeadlineId | null }>;
+export type FilingReceiptRecordedEvent = BaseEvent<'FILING_RECEIPT_RECORDED', FilingReceiptPayload>;
+export type AllowanceReceivedEvent = BaseEvent<'ALLOWANCE_RECEIVED', AllowanceReceivedPayload>;
+export type PatentGrantedEvent = BaseEvent<'PATENT_GRANTED', PatentGrantedPayload>;
 
 // ─── Claim Events ───────────────────────────────────────────────────
 
@@ -165,6 +184,7 @@ export interface ClaimCreatedPayload {
   claim_id: ClaimId;
   claim_number: number;
   claim_type: 'independent' | 'dependent';
+  claim_category: ClaimCategory | null;
   depends_on_claim_id: ClaimId | null;
   claim_text: string;
   ai_generated: boolean;
@@ -191,11 +211,15 @@ export type ClaimStatusChangedEvent = BaseEvent<
 
 export interface OaReceivedPayload {
   oa_id: OfficeActionId;
-  oa_type: 'non_final' | 'final' | 'restriction' | 'advisory';
+  oa_category: OfficeActionCategory;
+  oa_type_label: string;
+  mailing_date: string;
   received_date: string;
   response_deadline: string;
-  rejection_type: RejectionType;
+  rejection_bases: RejectionBasis[];
+  statutory_references: string[];
   cited_references: CitedReference[];
+  sequence_number: number;
 }
 
 export interface OaAnalysisCompletedPayload {
@@ -214,19 +238,20 @@ export interface OaAnalysisCompletedPayload {
 export type OaReceivedEvent = BaseEvent<'OA_RECEIVED', OaReceivedPayload>;
 export type OaClassifiedEvent = BaseEvent<
   'OA_CLASSIFIED',
-  {
-    oa_id: OfficeActionId;
-    from_status: OfficeActionStatus;
-    to_status: OfficeActionStatus;
-  }
+  { oa_id: OfficeActionId; from_status: OfficeActionStatus; to_status: OfficeActionStatus }
 >;
-export type OaAnalysisCompletedEvent = BaseEvent<
-  'OA_ANALYSIS_COMPLETED',
-  OaAnalysisCompletedPayload
->;
+export type OaAnalysisCompletedEvent = BaseEvent<'OA_ANALYSIS_COMPLETED', OaAnalysisCompletedPayload>;
 export type OaStrategySelectedEvent = BaseEvent<
   'OA_STRATEGY_SELECTED',
   { oa_id: OfficeActionId; selected_strategy_id: string; selected_by: ActorId }
+>;
+export type OaAmendmentDraftedEvent = BaseEvent<
+  'OA_AMENDMENT_DRAFTED',
+  { oa_id: OfficeActionId; claim_ids: ClaimId[]; ai_assisted: boolean }
+>;
+export type OaResponseReviewedEvent = BaseEvent<
+  'OA_RESPONSE_REVIEWED',
+  { oa_id: OfficeActionId; reviewed_by: ActorId; approved: boolean; comments: string | null }
 >;
 export type OaResponseFiledEvent = BaseEvent<
   'OA_RESPONSE_FILED',
@@ -238,10 +263,9 @@ export type OaResponseFiledEvent = BaseEvent<
 export interface DeadlineCreatedPayload {
   deadline_id: DeadlineId;
   deadline_type: 'statutory' | 'procedural' | 'internal';
-  source_entity_type: 'case' | 'office_action' | 'maintenance' | 'fee';
+  source_entity_type: 'case' | 'office_action' | 'fee' | 'examination_request' | 'priority_claim';
   source_entity_id: string;
   due_date: string;
-  /** Traceable source rule (e.g., "37 CFR 1.111", "USPTO MPEP 710.02(e)") */
   rule_reference: string | null;
 }
 
@@ -253,21 +277,11 @@ export interface DeadlineWarningSentPayload {
   channels: string[];
 }
 
-export type DeadlineCreatedEvent = BaseEvent<
-  'DEADLINE_CREATED',
-  DeadlineCreatedPayload
->;
-export type DeadlineWarningSentEvent = BaseEvent<
-  'DEADLINE_WARNING_SENT',
-  DeadlineWarningSentPayload
->;
+export type DeadlineCreatedEvent = BaseEvent<'DEADLINE_CREATED', DeadlineCreatedPayload>;
+export type DeadlineWarningSentEvent = BaseEvent<'DEADLINE_WARNING_SENT', DeadlineWarningSentPayload>;
 export type DeadlineEscalatedEvent = BaseEvent<
   'DEADLINE_ESCALATED',
-  {
-    deadline_id: DeadlineId;
-    from_level: EscalationLevel;
-    to_level: EscalationLevel;
-  }
+  { deadline_id: DeadlineId; from_level: EscalationLevel; to_level: EscalationLevel }
 >;
 export type DeadlineCompletedEvent = BaseEvent<
   'DEADLINE_COMPLETED',
@@ -276,6 +290,10 @@ export type DeadlineCompletedEvent = BaseEvent<
 export type DeadlineMissedEvent = BaseEvent<
   'DEADLINE_MISSED',
   { deadline_id: DeadlineId; missed_at: string; incident_created: boolean }
+>;
+export type DeadlineExtendedEvent = BaseEvent<
+  'DEADLINE_EXTENDED',
+  { deadline_id: DeadlineId; previous_due_date: string; new_due_date: string; extension_fee_id: FeeId | null }
 >;
 
 // ─── Conflict Check Events ─────────────────────────────────────────
@@ -298,11 +316,7 @@ export type ConflictCheckCompletedEvent = BaseEvent<
 >;
 export type ConflictOverrideApprovedEvent = BaseEvent<
   'CONFLICT_OVERRIDE_APPROVED',
-  {
-    check_id: ConflictCheckId;
-    approved_by: ActorId;
-    justification: string;
-  }
+  { check_id: ConflictCheckId; approved_by: ActorId; justification: string }
 >;
 
 // ─── Document Events ───────────────────────────────────────────────
@@ -311,33 +325,19 @@ export interface DocumentGeneratedPayload {
   document_id: DocumentId;
   document_type: DocumentType;
   version: number;
-  template_id: string;
+  template_id: string | null;
   content_hash: string;
   file_path: string;
 }
 
-export type DocumentGeneratedEvent = BaseEvent<
-  'DOCUMENT_GENERATED',
-  DocumentGeneratedPayload
->;
+export type DocumentGeneratedEvent = BaseEvent<'DOCUMENT_GENERATED', DocumentGeneratedPayload>;
 export type DocumentFinalizedEvent = BaseEvent<
   'DOCUMENT_FINALIZED',
-  {
-    document_id: DocumentId;
-    from_status: DocumentStatus;
-    to_status: 'final';
-    finalized_by: ActorId;
-    content_hash: string;
-  }
+  { document_id: DocumentId; from_status: DocumentStatus; to_status: 'final'; finalized_by: ActorId; content_hash: string }
 >;
 export type DocumentFiledEvent = BaseEvent<
   'DOCUMENT_FILED',
-  {
-    document_id: DocumentId;
-    filed_at: string;
-    filing_reference: string;
-    content_hash: string;
-  }
+  { document_id: DocumentId; filed_at: string; filing_reference: string; content_hash: string }
 >;
 
 // ─── AI Sidecar Events ────────────────────────────────────────────
@@ -350,10 +350,7 @@ export interface AiDraftCreatedPayload {
   artifact_hash: string;
 }
 
-export type AiDraftCreatedEvent = BaseEvent<
-  'AI_DRAFT_CREATED',
-  AiDraftCreatedPayload
->;
+export type AiDraftCreatedEvent = BaseEvent<'AI_DRAFT_CREATED', AiDraftCreatedPayload>;
 export type AiDraftAcceptedEvent = BaseEvent<
   'AI_DRAFT_ACCEPTED',
   { draft_event_id: EventId; accepted_by: ActorId; modifications: string | null }
@@ -367,131 +364,55 @@ export type AiDraftRejectedEvent = BaseEvent<
 
 export type PatentFamilyLinkedEvent = BaseEvent<
   'PATENT_FAMILY_LINKED',
-  {
-    family_id: PatentFamilyId;
-    parent_case_id: CaseId;
-    child_case_id: CaseId;
-    relationship_type: FamilyRelationshipType;
-    priority_date: string;
-  }
+  { family_id: PatentFamilyId; parent_case_id: CaseId; child_case_id: CaseId; relationship_type: FamilyRelationshipType; priority_date: string }
+>;
+export type PatentFamilyUnlinkedEvent = BaseEvent<
+  'PATENT_FAMILY_UNLINKED',
+  { family_id: PatentFamilyId; parent_case_id: CaseId; child_case_id: CaseId; reason: string }
 >;
 export type PriorityClaimRecordedEvent = BaseEvent<
   'PRIORITY_CLAIM_RECORDED',
-  {
-    claiming_case_id: CaseId;
-    parent_case_id: CaseId;
-    priority_date: string;
-    basis: string;
-  }
+  { claiming_case_id: CaseId; parent_case_id: CaseId; priority_date: string; basis: string }
 >;
 
 // ─── Fee Events ────────────────────────────────────────────────────
 
-export type FeeDeadlineCreatedEvent = BaseEvent<
-  'FEE_DEADLINE_CREATED',
-  {
-    fee_id: FeeId;
-    fee_type: FeeType;
-    amount: number;
-    currency: string;
-    due_date: string;
-    deadline_id: DeadlineId;
-  }
+export type FeeCreatedEvent = BaseEvent<
+  'FEE_CREATED',
+  { fee_id: FeeId; fee_type: FeeType; fee_label: string; amount: number; currency: string; due_date: string; deadline_id: DeadlineId | null }
 >;
 export type FeePaymentRecordedEvent = BaseEvent<
   'FEE_PAYMENT_RECORDED',
-  {
-    fee_id: FeeId;
-    fee_type: FeeType;
-    amount: number;
-    currency: string;
-    payment_reference: string;
-    paid_at: string;
-  }
+  { fee_id: FeeId; fee_type: FeeType; amount: number; currency: string; payment_reference: string; paid_at: string }
 >;
 export type FeeWaivedEvent = BaseEvent<
   'FEE_WAIVED',
-  {
-    fee_id: FeeId;
-    fee_type: FeeType;
-    waived_by: ActorId;
-    reason: string;
-  }
+  { fee_id: FeeId; fee_type: FeeType; waived_by: ActorId; reason: string }
 >;
 
-// ─── IDS / Duty of Candor Events ──────────────────────────────────
+// ─── Prior Art Events ──────────────────────────────────────────────
 
 export type PriorArtReferenceAddedEvent = BaseEvent<
   'PRIOR_ART_REFERENCE_ADDED',
-  {
-    reference_id: string;
-    reference_type: 'us_patent' | 'us_publication' | 'foreign' | 'npl';
-    document_number: string;
-    title: string;
-    source: 'oa_citation' | 'applicant_disclosure' | 'search_result';
-  }
->;
-export type IdsDraftedEvent = BaseEvent<
-  'IDS_DRAFTED',
-  {
-    ids_id: IdsId;
-    reference_ids: string[];
-    document_id: DocumentId;
-  }
->;
-export type IdsApprovedEvent = BaseEvent<
-  'IDS_APPROVED',
-  {
-    ids_id: IdsId;
-    approved_by: ActorId;
-  }
->;
-export type IdsFiledEvent = BaseEvent<
-  'IDS_FILED',
-  {
-    ids_id: IdsId;
-    document_id: DocumentId;
-    filed_at: string;
-    content_hash: string;
-  }
->;
-export type IdsCoverageWarningEvent = BaseEvent<
-  'IDS_COVERAGE_WARNING',
-  {
-    uncovered_reference_ids: string[];
-    warning_message: string;
-  }
+  { reference_id: string; reference_type: 'patent' | 'publication' | 'npl'; document_number: string; title: string; source: 'oa_citation' | 'applicant_disclosure' | 'search_result' }
 >;
 
 // ─── Declaration Events ───────────────────────────────────────────
 
 export type DeclarationRequestedEvent = BaseEvent<
   'DECLARATION_REQUESTED',
-  {
-    inventor_id: ActorId;
-    document_id: DocumentId;
-  }
+  { inventor_id: ActorId; document_id: DocumentId }
 >;
 export type DeclarationSignedEvent = BaseEvent<
   'DECLARATION_SIGNED',
-  {
-    inventor_id: ActorId;
-    document_id: DocumentId;
-    signed_at: string;
-    content_hash: string;
-  }
+  { inventor_id: ActorId; document_id: DocumentId; signed_at: string; content_hash: string }
 >;
 
 // ─── Incident Events ──────────────────────────────────────────────
 
 export type IncidentCreatedEvent = BaseEvent<
   'INCIDENT_CREATED',
-  {
-    incident_type: 'deadline_missed' | 'system_failure' | 'data_integrity';
-    source_event_id: EventId;
-    severity: 'critical' | 'high' | 'medium';
-    description: string;
-  }
+  { incident_type: 'deadline_missed' | 'system_failure' | 'data_integrity'; source_event_id: EventId; severity: 'critical' | 'high' | 'medium'; description: string }
 >;
 
 // ─── Union Type ─────────────────────────────────────────────────────
@@ -500,6 +421,10 @@ export type DomainEvent =
   | CaseCreatedEvent
   | CaseStatusChangedEvent
   | CaseClosedEvent
+  | ExaminationRequestedEvent
+  | FilingReceiptRecordedEvent
+  | AllowanceReceivedEvent
+  | PatentGrantedEvent
   | ClaimCreatedEvent
   | ClaimAmendedEvent
   | ClaimStatusChangedEvent
@@ -507,12 +432,15 @@ export type DomainEvent =
   | OaClassifiedEvent
   | OaAnalysisCompletedEvent
   | OaStrategySelectedEvent
+  | OaAmendmentDraftedEvent
+  | OaResponseReviewedEvent
   | OaResponseFiledEvent
   | DeadlineCreatedEvent
   | DeadlineWarningSentEvent
   | DeadlineEscalatedEvent
   | DeadlineCompletedEvent
   | DeadlineMissedEvent
+  | DeadlineExtendedEvent
   | ConflictCheckInitiatedEvent
   | ConflictCheckCompletedEvent
   | ConflictOverrideApprovedEvent
@@ -523,15 +451,12 @@ export type DomainEvent =
   | AiDraftAcceptedEvent
   | AiDraftRejectedEvent
   | PatentFamilyLinkedEvent
+  | PatentFamilyUnlinkedEvent
   | PriorityClaimRecordedEvent
-  | FeeDeadlineCreatedEvent
+  | FeeCreatedEvent
   | FeePaymentRecordedEvent
   | FeeWaivedEvent
   | PriorArtReferenceAddedEvent
-  | IdsDraftedEvent
-  | IdsApprovedEvent
-  | IdsFiledEvent
-  | IdsCoverageWarningEvent
   | DeclarationRequestedEvent
   | DeclarationSignedEvent
   | IncidentCreatedEvent;

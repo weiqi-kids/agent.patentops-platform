@@ -3,6 +3,9 @@
  *
  * Defines valid state transitions and the role permissions required for each.
  * This is the core enforcement point for workflow integrity.
+ *
+ * States reflect the universal patent prosecution lifecycle, not
+ * any single jurisdiction's terminology.
  */
 
 import type { CaseStatus, ActorRole } from '../../shared/types/index.js';
@@ -17,6 +20,7 @@ export interface StateTransition {
 }
 
 export const CASE_STATE_TRANSITIONS: StateTransition[] = [
+  // ─── Pre-filing ────────────────────────────────────────────────
   {
     from: 'INTAKE',
     to: 'DRAFTING',
@@ -49,39 +53,96 @@ export const CASE_STATE_TRANSITIONS: StateTransition[] = [
     requires_human_review: true,
     description: 'Approve for filing (mandatory human checkpoint)',
   },
+
+  // ─── Filing ────────────────────────────────────────────────────
   {
     from: 'FILING',
-    to: 'PENDING',
-    allowed_roles: ['reviewer', 'partner', 'system'],
+    to: 'FILED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Mark as filed with patent office',
+    description: 'Application filed with patent office',
   },
+
+  // ─── Examination request (TW/EP/JP — separate from filing) ────
   {
-    from: 'PENDING',
+    from: 'FILED',
+    to: 'EXAMINATION_REQUESTED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Substantive examination requested',
+  },
+
+  // ─── Office Action ────────────────────────────────────────────
+  {
+    from: 'FILED',
     to: 'OA_RECEIVED',
     allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Office Action received (often docketed by paralegal)',
+    description: 'Office action received',
+  },
+  {
+    from: 'EXAMINATION_REQUESTED',
+    to: 'OA_RECEIVED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Office action received after examination requested',
   },
   {
     from: 'OA_RECEIVED',
-    to: 'PENDING',
+    to: 'FILED',
     allowed_roles: ['reviewer', 'partner'],
     requires_conflict_check: false,
     requires_human_review: true,
-    description: 'OA response filed, back to pending',
+    description: 'OA response filed, back to filed status',
   },
   {
-    from: 'PENDING',
-    to: 'CLOSED',
-    allowed_roles: ['reviewer', 'partner'],
+    from: 'OA_RECEIVED',
+    to: 'OA_RECEIVED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Patent granted or case concluded',
+    description: 'New OA received while previous OA still active (e.g., restriction + rejection)',
   },
-  // Withdrawal can happen from most states
+
+  // ─── Allowance & Grant ────────────────────────────────────────
+  {
+    from: 'FILED',
+    to: 'ALLOWED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Notice of allowance received / 核准審定',
+  },
+  {
+    from: 'EXAMINATION_REQUESTED',
+    to: 'ALLOWED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Allowed after examination',
+  },
+  {
+    from: 'OA_RECEIVED',
+    to: 'ALLOWED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Allowed after OA response',
+  },
+  {
+    from: 'ALLOWED',
+    to: 'GRANTED',
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Patent granted / 公告 after issue fee paid',
+  },
+
+  // ─── Withdrawal / Abandonment (from most states) ──────────────
   {
     from: 'INTAKE',
     to: 'CLOSED',
@@ -99,12 +160,20 @@ export const CASE_STATE_TRANSITIONS: StateTransition[] = [
     description: 'Withdraw during drafting',
   },
   {
-    from: 'PENDING',
+    from: 'FILED',
     to: 'CLOSED',
     allowed_roles: ['partner'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Abandon pending case',
+    description: 'Abandon filed case',
+  },
+  {
+    from: 'EXAMINATION_REQUESTED',
+    to: 'CLOSED',
+    allowed_roles: ['partner'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Abandon after examination requested',
   },
   {
     from: 'OA_RECEIVED',
@@ -112,7 +181,23 @@ export const CASE_STATE_TRANSITIONS: StateTransition[] = [
     allowed_roles: ['partner'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Abandon after OA',
+    description: 'Abandon after OA (e.g., no response filed)',
+  },
+  {
+    from: 'ALLOWED',
+    to: 'CLOSED',
+    allowed_roles: ['partner'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Abandon by not paying issue fee',
+  },
+  {
+    from: 'GRANTED',
+    to: 'CLOSED',
+    allowed_roles: ['partner', 'system'],
+    requires_conflict_check: false,
+    requires_human_review: false,
+    description: 'Patent lapsed/expired',
   },
 ];
 
