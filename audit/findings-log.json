@@ -1,0 +1,7 @@
+{
+  "_metadata": {
+    "schema_version": "1.0",
+    "description": "PatentOps Audit Findings Log — tracks deviations, incidents, and remediation actions"
+  },
+  "findings": []
+}

@@ -1,0 +1,121 @@
+{
+  "_metadata": {
+    "schema_version": "1.0",
+    "last_reviewed_at": "2026-03-02T00:00:00Z",
+    "description": "PatentOps QMS Document Index — tracks all governance documents, SOPs, and policies"
+  },
+  "documents": [
+    {
+      "document_id": "DOC-POL-001",
+      "title": "Information Security Policy",
+      "document_type": "Policy",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "platform_admin",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "all_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-POL-002",
+      "title": "AI Usage and Governance Policy",
+      "document_type": "Policy",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "quality_manager",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "all_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-001",
+      "title": "Patent Case Intake Procedure",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "operations_lead",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "patent_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-002",
+      "title": "Office Action Response Procedure",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "operations_lead",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "patent_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-003",
+      "title": "Deadline Escalation Procedure",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "operations_lead",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "all_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-004",
+      "title": "Conflict of Interest Check Procedure",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "quality_manager",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "patent_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-005",
+      "title": "Evidence Pack Generation and Review Procedure",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "quality_manager",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "admin_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    },
+    {
+      "document_id": "DOC-SOP-006",
+      "title": "Incident Management Procedure (Missed Deadlines)",
+      "document_type": "SOP",
+      "version": "1.0",
+      "status": "Draft",
+      "effective_date": null,
+      "owner_role": "operations_lead",
+      "supersedes_document_id": null,
+      "distribution_list_reference": "all_staff",
+      "notification_evidence_path": null,
+      "archival_location": "/qms/archive/",
+      "review_cycle": "Annual"
+    }
+  ]
+}

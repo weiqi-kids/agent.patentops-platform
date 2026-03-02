@@ -1,0 +1,119 @@
+{
+  "_metadata": {
+    "schema_version": "1.0",
+    "last_reviewed_at": "2026-03-02T00:00:00Z",
+    "description": "RBAC Role Matrix — defines permissions for each role in the PatentOps platform"
+  },
+  "roles": {
+    "client": {
+      "description": "External client / patent applicant",
+      "permissions": {
+        "case": ["view_own"],
+        "claim": ["view"],
+        "document": ["view_final", "download"],
+        "deadline": ["view_own"],
+        "office_action": ["view"],
+        "conflict_check": [],
+        "admin": [],
+        "ai": []
+      },
+      "state_transitions_allowed": [],
+      "can_mark_final": false,
+      "can_file": false
+    },
+    "associate": {
+      "description": "Junior patent professional / patent agent",
+      "permissions": {
+        "case": ["view_assigned", "update_assigned"],
+        "claim": ["view", "create_draft", "edit_draft"],
+        "document": ["view", "generate_draft"],
+        "deadline": ["view_assigned", "complete"],
+        "office_action": ["view", "analyze", "draft_response"],
+        "conflict_check": ["view"],
+        "admin": [],
+        "ai": ["invoke_draft", "invoke_analysis"]
+      },
+      "state_transitions_allowed": [
+        "DRAFTING->REVIEW",
+        "OA_RECEIVED->ANALYZING",
+        "ANALYZING->STRATEGIZING",
+        "STRATEGIZING->AMENDING",
+        "AMENDING->OA_REVIEW"
+      ],
+      "can_mark_final": false,
+      "can_file": false
+    },
+    "reviewer": {
+      "description": "Senior patent attorney / licensed reviewer",
+      "permissions": {
+        "case": ["view_all", "update_all"],
+        "claim": ["view", "create_draft", "edit_draft", "approve", "reject"],
+        "document": ["view", "generate_draft", "finalize"],
+        "deadline": ["view_all", "complete", "waive", "extend"],
+        "office_action": ["view", "analyze", "draft_response", "approve_response"],
+        "conflict_check": ["view", "review"],
+        "admin": [],
+        "ai": ["invoke_draft", "invoke_analysis"]
+      },
+      "state_transitions_allowed": [
+        "DRAFTING->REVIEW",
+        "REVIEW->FILING",
+        "REVIEW->DRAFTING",
+        "OA_REVIEW->OA_FILING",
+        "OA_REVIEW->AMENDING"
+      ],
+      "can_mark_final": true,
+      "can_file": true
+    },
+    "partner": {
+      "description": "Managing partner / firm principal",
+      "permissions": {
+        "case": ["view_all", "update_all", "create", "close", "withdraw"],
+        "claim": ["view", "create_draft", "edit_draft", "approve", "reject"],
+        "document": ["view", "generate_draft", "finalize", "file"],
+        "deadline": ["view_all", "complete", "waive", "extend"],
+        "office_action": ["view", "analyze", "draft_response", "approve_response", "file_response"],
+        "conflict_check": ["view", "review", "override"],
+        "admin": ["manage_users", "view_billing", "export_audit"],
+        "ai": ["invoke_draft", "invoke_analysis", "configure"]
+      },
+      "state_transitions_allowed": ["*"],
+      "can_mark_final": true,
+      "can_file": true
+    },
+    "admin": {
+      "description": "Platform administrator (non-legal, technical role)",
+      "permissions": {
+        "case": ["view_all"],
+        "claim": ["view"],
+        "document": ["view"],
+        "deadline": ["view_all"],
+        "office_action": ["view"],
+        "conflict_check": ["view"],
+        "admin": ["manage_users", "manage_tenants", "view_billing", "configure_system", "export_audit"],
+        "ai": ["configure"]
+      },
+      "state_transitions_allowed": [],
+      "can_mark_final": false,
+      "can_file": false
+    },
+    "system": {
+      "description": "Automated system actor (deadline engine, event projector, AI sidecar)",
+      "permissions": {
+        "case": ["view_all", "update_status"],
+        "claim": [],
+        "document": [],
+        "deadline": ["create", "update_status", "send_warning"],
+        "office_action": ["update_status"],
+        "conflict_check": [],
+        "admin": [],
+        "ai": ["invoke_draft", "invoke_analysis"]
+      },
+      "state_transitions_allowed": [
+        "PENDING->OA_RECEIVED"
+      ],
+      "can_mark_final": false,
+      "can_file": false
+    }
+  }
+}

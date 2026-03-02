@@ -1,0 +1,105 @@
+{
+  "_metadata": {
+    "schema_version": "1.0",
+    "last_reviewed_at": "2026-03-02T00:00:00Z",
+    "description": "RACI Matrix — Responsible, Accountable, Consulted, Informed for key PatentOps processes"
+  },
+  "legend": {
+    "R": "Responsible — performs the work",
+    "A": "Accountable — ultimately answerable, approves",
+    "C": "Consulted — provides input before decision",
+    "I": "Informed — notified after decision"
+  },
+  "processes": {
+    "case_intake": {
+      "description": "New patent case creation and acceptance",
+      "client": "R",
+      "associate": "R",
+      "reviewer": "C",
+      "partner": "A",
+      "admin": "I",
+      "system": "I"
+    },
+    "conflict_check": {
+      "description": "Conflict of interest screening at case intake",
+      "client": "I",
+      "associate": "I",
+      "reviewer": "R",
+      "partner": "A",
+      "admin": "I",
+      "system": "R"
+    },
+    "claim_drafting": {
+      "description": "Drafting patent claims (AI-assisted)",
+      "client": "C",
+      "associate": "R",
+      "reviewer": "A",
+      "partner": "I",
+      "admin": "-",
+      "system": "R"
+    },
+    "claim_review": {
+      "description": "Reviewing and approving drafted claims",
+      "client": "I",
+      "associate": "C",
+      "reviewer": "R",
+      "partner": "A",
+      "admin": "-",
+      "system": "-"
+    },
+    "document_filing": {
+      "description": "Generating and filing patent documents",
+      "client": "I",
+      "associate": "R",
+      "reviewer": "A",
+      "partner": "I",
+      "admin": "-",
+      "system": "R"
+    },
+    "oa_analysis": {
+      "description": "Analyzing received Office Actions",
+      "client": "I",
+      "associate": "R",
+      "reviewer": "C",
+      "partner": "I",
+      "admin": "-",
+      "system": "R"
+    },
+    "oa_response": {
+      "description": "Drafting and filing Office Action responses",
+      "client": "I",
+      "associate": "R",
+      "reviewer": "A",
+      "partner": "I",
+      "admin": "-",
+      "system": "R"
+    },
+    "deadline_management": {
+      "description": "Monitoring and escalating deadlines",
+      "client": "I",
+      "associate": "I",
+      "reviewer": "I",
+      "partner": "I",
+      "admin": "-",
+      "system": "R"
+    },
+    "evidence_pack_generation": {
+      "description": "Quarterly audit evidence package generation",
+      "client": "-",
+      "associate": "-",
+      "reviewer": "-",
+      "partner": "I",
+      "admin": "A",
+      "system": "R"
+    },
+    "incident_management": {
+      "description": "Handling missed deadlines and system incidents",
+      "client": "I",
+      "associate": "I",
+      "reviewer": "C",
+      "partner": "A",
+      "admin": "R",
+      "system": "R"
+    }
+  }
+}
