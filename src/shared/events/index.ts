@@ -29,6 +29,13 @@ import type {
   DocumentType,
   DocumentStatus,
   CitedReference,
+  PatentFamilyId,
+  FamilyRelationshipType,
+  FeeId,
+  FeeType,
+  FeeStatus,
+  IdsId,
+  IdsStatus,
 } from '../types/index.js';
 
 // ─── Event Type Registry ────────────────────────────────────────────
@@ -80,9 +87,30 @@ export const EVENT_TYPES = [
   'AI_DRAFT_REJECTED',
   'AI_DRAFT_MODIFIED',
 
-  // Audit / system
+  // Patent family
+  'PATENT_FAMILY_LINKED',
+  'PATENT_FAMILY_UNLINKED',
+  'PRIORITY_CLAIM_RECORDED',
+
+  // Fee tracking
+  'FEE_DEADLINE_CREATED',
+  'FEE_PAYMENT_RECORDED',
+  'FEE_WAIVED',
+
+  // IDS (Information Disclosure Statement) / Duty of Candor
+  'PRIOR_ART_REFERENCE_ADDED',
+  'IDS_DRAFTED',
+  'IDS_APPROVED',
+  'IDS_FILED',
+  'IDS_COVERAGE_WARNING',
+
+  // Inventor declarations
+  'DECLARATION_REQUESTED',
+  'DECLARATION_SIGNED',
+
+  // System
   'ARTIFACT_HASH_RECORDED',
-  'EVIDENCE_PACK_GENERATED',
+  'INCIDENT_CREATED',
 ] as const;
 
 export type EventType = (typeof EVENT_TYPES)[number];
@@ -210,9 +238,11 @@ export type OaResponseFiledEvent = BaseEvent<
 export interface DeadlineCreatedPayload {
   deadline_id: DeadlineId;
   deadline_type: 'statutory' | 'procedural' | 'internal';
-  source_entity_type: 'case' | 'office_action' | 'maintenance';
+  source_entity_type: 'case' | 'office_action' | 'maintenance' | 'fee';
   source_entity_id: string;
   due_date: string;
+  /** Traceable source rule (e.g., "37 CFR 1.111", "USPTO MPEP 710.02(e)") */
+  rule_reference: string | null;
 }
 
 export interface DeadlineWarningSentPayload {
@@ -333,6 +363,137 @@ export type AiDraftRejectedEvent = BaseEvent<
   { draft_event_id: EventId; rejected_by: ActorId; reason: string }
 >;
 
+// ─── Patent Family Events ──────────────────────────────────────────
+
+export type PatentFamilyLinkedEvent = BaseEvent<
+  'PATENT_FAMILY_LINKED',
+  {
+    family_id: PatentFamilyId;
+    parent_case_id: CaseId;
+    child_case_id: CaseId;
+    relationship_type: FamilyRelationshipType;
+    priority_date: string;
+  }
+>;
+export type PriorityClaimRecordedEvent = BaseEvent<
+  'PRIORITY_CLAIM_RECORDED',
+  {
+    claiming_case_id: CaseId;
+    parent_case_id: CaseId;
+    priority_date: string;
+    basis: string;
+  }
+>;
+
+// ─── Fee Events ────────────────────────────────────────────────────
+
+export type FeeDeadlineCreatedEvent = BaseEvent<
+  'FEE_DEADLINE_CREATED',
+  {
+    fee_id: FeeId;
+    fee_type: FeeType;
+    amount: number;
+    currency: string;
+    due_date: string;
+    deadline_id: DeadlineId;
+  }
+>;
+export type FeePaymentRecordedEvent = BaseEvent<
+  'FEE_PAYMENT_RECORDED',
+  {
+    fee_id: FeeId;
+    fee_type: FeeType;
+    amount: number;
+    currency: string;
+    payment_reference: string;
+    paid_at: string;
+  }
+>;
+export type FeeWaivedEvent = BaseEvent<
+  'FEE_WAIVED',
+  {
+    fee_id: FeeId;
+    fee_type: FeeType;
+    waived_by: ActorId;
+    reason: string;
+  }
+>;
+
+// ─── IDS / Duty of Candor Events ──────────────────────────────────
+
+export type PriorArtReferenceAddedEvent = BaseEvent<
+  'PRIOR_ART_REFERENCE_ADDED',
+  {
+    reference_id: string;
+    reference_type: 'us_patent' | 'us_publication' | 'foreign' | 'npl';
+    document_number: string;
+    title: string;
+    source: 'oa_citation' | 'applicant_disclosure' | 'search_result';
+  }
+>;
+export type IdsDraftedEvent = BaseEvent<
+  'IDS_DRAFTED',
+  {
+    ids_id: IdsId;
+    reference_ids: string[];
+    document_id: DocumentId;
+  }
+>;
+export type IdsApprovedEvent = BaseEvent<
+  'IDS_APPROVED',
+  {
+    ids_id: IdsId;
+    approved_by: ActorId;
+  }
+>;
+export type IdsFiledEvent = BaseEvent<
+  'IDS_FILED',
+  {
+    ids_id: IdsId;
+    document_id: DocumentId;
+    filed_at: string;
+    content_hash: string;
+  }
+>;
+export type IdsCoverageWarningEvent = BaseEvent<
+  'IDS_COVERAGE_WARNING',
+  {
+    uncovered_reference_ids: string[];
+    warning_message: string;
+  }
+>;
+
+// ─── Declaration Events ───────────────────────────────────────────
+
+export type DeclarationRequestedEvent = BaseEvent<
+  'DECLARATION_REQUESTED',
+  {
+    inventor_id: ActorId;
+    document_id: DocumentId;
+  }
+>;
+export type DeclarationSignedEvent = BaseEvent<
+  'DECLARATION_SIGNED',
+  {
+    inventor_id: ActorId;
+    document_id: DocumentId;
+    signed_at: string;
+    content_hash: string;
+  }
+>;
+
+// ─── Incident Events ──────────────────────────────────────────────
+
+export type IncidentCreatedEvent = BaseEvent<
+  'INCIDENT_CREATED',
+  {
+    incident_type: 'deadline_missed' | 'system_failure' | 'data_integrity';
+    source_event_id: EventId;
+    severity: 'critical' | 'high' | 'medium';
+    description: string;
+  }
+>;
+
 // ─── Union Type ─────────────────────────────────────────────────────
 
 export type DomainEvent =
@@ -360,4 +521,17 @@ export type DomainEvent =
   | DocumentFiledEvent
   | AiDraftCreatedEvent
   | AiDraftAcceptedEvent
-  | AiDraftRejectedEvent;
+  | AiDraftRejectedEvent
+  | PatentFamilyLinkedEvent
+  | PriorityClaimRecordedEvent
+  | FeeDeadlineCreatedEvent
+  | FeePaymentRecordedEvent
+  | FeeWaivedEvent
+  | PriorArtReferenceAddedEvent
+  | IdsDraftedEvent
+  | IdsApprovedEvent
+  | IdsFiledEvent
+  | IdsCoverageWarningEvent
+  | DeclarationRequestedEvent
+  | DeclarationSignedEvent
+  | IncidentCreatedEvent;

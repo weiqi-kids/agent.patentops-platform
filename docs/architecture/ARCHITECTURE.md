@@ -179,11 +179,16 @@ Case
 ├── title
 ├── status (state machine)
 ├── applicant_id
+├── inventor_ids (ULID[])
 ├── assigned_attorney_id
-├── assigned_associate_id
+├── assigned_associate_id (nullable)
+├── assigned_paralegal_id (nullable)
+├── foreign_associate_id (nullable)
 ├── jurisdiction
 ├── filing_date
 ├── priority_date
+├── parent_case_id (nullable, FK — for continuations/divisionals)
+├── family_id (nullable, FK)
 ├── current_version
 └── created_at
 
@@ -219,11 +224,12 @@ Deadline
 ├── case_id (FK)
 ├── tenant_id (FK)
 ├── deadline_type (statutory | procedural | internal)
-├── source_entity_type (case | office_action | maintenance)
+├── source_entity_type (case | office_action | maintenance | fee)
 ├── source_entity_id
 ├── due_date
+├── rule_reference (statutory/regulatory source for this deadline)
 ├── warning_sent_at (JSON array of timestamps)
-├── escalation_level (0-3)
+├── escalation_level (0-5)
 ├── status (active | completed | waived | missed)
 └── created_at
 
@@ -255,9 +261,43 @@ Actor
 ├── tenant_id (FK)
 ├── email
 ├── name
-├── role (client | associate | reviewer | partner | admin)
+├── role (client | inventor | paralegal | associate | reviewer | partner | foreign_associate | admin)
 ├── license_number (nullable)
+├── jurisdiction (nullable — for foreign associates)
 ├── is_active
+└── created_at
+
+PatentFamilyLink
+├── family_id (ULID)
+├── tenant_id (FK)
+├── parent_case_id (FK)
+├── child_case_id (FK)
+├── relationship_type (continuation | divisional | continuation_in_part | provisional_to_nonprovisional | pct_national_phase)
+├── priority_date
+└── created_at
+
+Fee
+├── fee_id (ULID)
+├── case_id (FK)
+├── tenant_id (FK)
+├── fee_type (filing | search | examination | issue | maintenance_3_5 | maintenance_7_5 | maintenance_11_5 | extension | petition | foreign_filing)
+├── amount
+├── currency
+├── due_date
+├── status (pending | paid | overdue | waived)
+├── paid_at (nullable)
+├── payment_reference (nullable)
+├── deadline_id (FK, nullable)
+└── created_at
+
+IdsRecord
+├── ids_id (ULID)
+├── case_id (FK)
+├── tenant_id (FK)
+├── references (JSON — IdsReference[])
+├── status (draft | pending_review | approved | filed)
+├── filed_date (nullable)
+├── document_id (FK, nullable)
 └── created_at
 ```
 
@@ -356,29 +396,54 @@ Reviewer → Mandatory review checkpoint
 
 ---
 
-## 9. Compliance Considerations
+## 9. Compliance & Governance
 
-### Audit Trail Requirements (Inspired by SOC1 / ISQM1)
+### Patent Prosecution Governance
 
-The governance structure follows patterns from the Assurance Ledger Platform:
+This platform's governance structure is designed specifically for patent prosecution workflows, not adapted from financial audit frameworks. The core governance requirements come from:
 
-- **Control Inventory**: `/governance/control-inventory.json` — all controls with owner, frequency, evidence types
-- **Role Matrix**: `/governance/role-matrix.json` — RBAC role definitions
-- **RACI Matrix**: `/governance/raci-matrix.json` — responsibility assignment
-- **Evidence Packages**: `/audit/evidence-packages/YYYY-QX/` — quarterly evidence packs with manifest, hash, attestation
-- **Findings Log**: `/audit/findings-log.json` — deviation tracking
-- **Risk Register**: `/qms/risk-register.json` — risk identification and mitigation
+- **Professional responsibility rules** (e.g., USPTO Rules of Professional Conduct)
+- **Statutory deadline obligations** (e.g., 37 CFR response periods)
+- **Duty of candor** (37 CFR 1.56 — duty to disclose material prior art)
+- **Attorney-client privilege** boundaries
+- **Prosecution history estoppel** tracking requirements
 
-### Evidence Hash Chain
+### Governance Artifacts
+
+- **Control Inventory**: `/governance/control-inventory.json` — prosecution and platform integrity controls
+- **Role Matrix**: `/governance/role-matrix.json` — RBAC with patent-specific roles (paralegal, inventor, foreign associate)
+- **RACI Matrix**: `/governance/raci-matrix.json` — responsibility assignment for 14 prosecution processes
+- **Risk Register**: `/qms/risk-register.json` — 12 risks including IDS duty, fee management, patent family integrity
+- **Findings Log**: `/audit/findings-log.json` — incident and deviation tracking
+
+### Evidence Structure: Per-Case File Wrapper
+
+Evidence is organized per case, not in quarterly batches. The patent case file wrapper is the natural unit of evidence:
+
+```
+/cases/{case_id}/
+├── events/          ← complete event chain for this case
+├── filings/         ← filed documents with hashes
+├── claims/          ← claim version history
+├── office-actions/  ← received OAs and responses
+├── ids/             ← IDS filings and reference tracking
+├── declarations/    ← inventor oath/declaration
+└── correspondence/  ← client communications
+```
+
+### Hash Chain Integrity
 - Every filed document has a SHA-256 hash stored in the event ledger
-- Hash chain per case enables independent verification
-- Quarterly evidence packs include hash recomputation proof
+- Hash chain per case enables independent verification and tamper detection
+- Verification is exhaustive (every event), not sampled — event sourcing makes this possible
 
-### Professional Liability
+### Professional Liability Controls
 - All AI outputs watermarked: `AI-GENERATED DRAFT — NOT LEGAL ADVICE`
 - Human approval checkpoints enforced by state machine (cannot skip)
+- Only licensed professionals (reviewer/partner) can mark FINAL or FILE
 - Amendment lineage tracking: full diff history from original to filed version
-- Actor identity recorded on every state transition
+- Actor identity and role recorded on every state transition
+- IDS completeness tracking: system warns when known prior art lacks IDS coverage
+- Conflict of interest: mandatory gate at INTAKE, partner-level override with justification
 
 ---
 
@@ -426,14 +491,17 @@ Billing events are emitted to the event store like any other event, ensuring aud
 
 ### 12.1 Deadline Engine
 
-The most critical operational module. A missed patent deadline can result in loss of rights.
+The most critical operational module. A missed patent deadline can result in irrecoverable loss of rights.
 
 **Responsibilities:**
 - Calculate statutory deadlines from Office Action dates (jurisdiction-specific rules)
+- Deadline calculation rules are **traceable to statutory/regulatory sources** (e.g., "37 CFR 1.111")
 - Track procedural deadlines (internal review windows)
-- Multi-level escalation: email → dashboard alert → manager notification → partner escalation
+- Track fee payment deadlines (filing fees, maintenance fees, extension fees)
+- Multi-level escalation: dashboard → email → SMS → all stakeholders
 - Support deadline extensions (e.g., USPTO 3-month + extension fees)
 - Daily sweep job + real-time event-triggered recalculation
+- Paralegal is the primary operator; escalation reaches attorney → partner
 
 **Escalation Matrix:**
 | Days Before Due | Level | Action |
@@ -496,3 +564,57 @@ Template Selection → Data Binding → Draft Preview → Human Approval → Has
 - Case cannot proceed past INTAKE without conflict check completion
 - CONFLICT_FOUND requires partner-level review and explicit override with documented justification
 - All conflict check results are recorded as events in the ledger
+
+### 12.5 IDS / Duty of Candor Tracker
+
+**Why this exists:** Under 37 CFR 1.56, patent applicants have a duty to disclose all known material prior art to the USPTO. Failure to do so can render a granted patent unenforceable due to inequitable conduct. This is not optional.
+
+**Responsibilities:**
+- Track all known prior art references per case (from OA citations, applicant disclosures, search results)
+- Track IDS filing status: which references have been covered by filed IDS
+- Warn when references exist but no IDS has been filed covering them
+- Warn when a case is approaching CLOSED(granted) with uncovered references
+- Maintain complete reference → IDS mapping for audit
+
+**Flow:**
+```
+Prior Art Reference Added → System checks IDS coverage
+    → If uncovered: IDS_COVERAGE_WARNING event emitted
+    → Paralegal/Associate prepares IDS draft
+    → Reviewer approves IDS
+    → IDS filed with patent office
+    → IDS_FILED event with content hash
+```
+
+### 12.6 Fee Management
+
+**Responsibilities:**
+- Track all prosecution fees per case (filing, search, examination, issue, extensions)
+- Track maintenance fee deadlines (3.5, 7.5, 11.5 year windows for US patents)
+- Integrate with Deadline Engine — fee deadlines use the same escalation chain
+- Record fee payments with payment references
+- Support fee waivers (with partner approval and documented reason)
+
+**Fee deadlines are treated with the same severity as OA response deadlines** — a missed maintenance fee can result in patent lapse.
+
+### 12.7 Patent Family Tracker
+
+**Responsibilities:**
+- Track relationships between related applications: continuation, divisional, CIP, provisional→non-provisional, PCT national phase
+- Enforce bidirectional links (if case A is parent of case B, case B must reference case A)
+- Validate priority date chains (child's priority date must align with parent's filing date)
+- Display family tree visualization in portal
+
+**Rules:**
+- Family links are recorded as events in the ledger
+- Priority claims require reviewer-level approval
+- Inconsistent priority dates are flagged automatically
+
+### 12.8 Inventor Declaration Management
+
+**Responsibilities:**
+- Track which inventors need to sign oath/declaration for each case
+- Generate declaration documents from templates
+- Track signature status per inventor
+- Warn when declarations are outstanding as case approaches filing
+- Record signed declarations with content hash in ledger

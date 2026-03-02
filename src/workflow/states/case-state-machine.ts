@@ -60,10 +60,10 @@ export const CASE_STATE_TRANSITIONS: StateTransition[] = [
   {
     from: 'PENDING',
     to: 'OA_RECEIVED',
-    allowed_roles: ['associate', 'reviewer', 'partner', 'system'],
+    allowed_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'system'],
     requires_conflict_check: false,
     requires_human_review: false,
-    description: 'Office Action received',
+    description: 'Office Action received (often docketed by paralegal)',
   },
   {
     from: 'OA_RECEIVED',

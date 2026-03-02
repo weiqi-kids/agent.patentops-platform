@@ -38,42 +38,42 @@ export const DEFAULT_ESCALATION_RULES: EscalationRule[] = [
     level: 0,
     label: 'info',
     channels: ['dashboard'],
-    notify_roles: ['associate'],
+    notify_roles: ['paralegal', 'associate'],
   },
   {
     days_before_due: 14,
     level: 1,
     label: 'warning',
     channels: ['dashboard', 'email'],
-    notify_roles: ['associate'],
+    notify_roles: ['paralegal', 'associate'],
   },
   {
     days_before_due: 7,
     level: 2,
     label: 'urgent',
     channels: ['dashboard', 'email'],
-    notify_roles: ['associate', 'reviewer'],
+    notify_roles: ['paralegal', 'associate', 'reviewer'],
   },
   {
     days_before_due: 3,
     level: 3,
     label: 'critical',
     channels: ['dashboard', 'email'],
-    notify_roles: ['associate', 'reviewer', 'partner'],
+    notify_roles: ['paralegal', 'associate', 'reviewer', 'partner'],
   },
   {
     days_before_due: 1,
     level: 4,
     label: 'emergency',
     channels: ['dashboard', 'email', 'sms'],
-    notify_roles: ['associate', 'reviewer', 'partner'],
+    notify_roles: ['paralegal', 'associate', 'reviewer', 'partner'],
   },
   {
     days_before_due: 0,
     level: 5,
     label: 'incident',
     channels: ['dashboard', 'email', 'sms', 'webhook'],
-    notify_roles: ['associate', 'reviewer', 'partner', 'admin'],
+    notify_roles: ['paralegal', 'associate', 'reviewer', 'partner', 'admin'],
   },
 ];
 
@@ -87,6 +87,8 @@ export interface JurisdictionDeadlineRule {
   extension_period_months: number;
   extension_requires_fee: boolean;
   absolute_max_months: number;
+  /** Statutory/regulatory source for this rule (e.g., "37 CFR 1.111", "MPEP 710.02(e)") */
+  rule_reference: string;
 }
 
 /**
@@ -102,6 +104,7 @@ export const USPTO_DEADLINE_RULES: JurisdictionDeadlineRule[] = [
     extension_period_months: 1,
     extension_requires_fee: true,
     absolute_max_months: 6,
+    rule_reference: '37 CFR 1.111; MPEP 710.02(e)',
   },
   {
     jurisdiction: 'US',
@@ -111,6 +114,7 @@ export const USPTO_DEADLINE_RULES: JurisdictionDeadlineRule[] = [
     extension_period_months: 1,
     extension_requires_fee: true,
     absolute_max_months: 6,
+    rule_reference: '37 CFR 1.113; MPEP 706.07(a)',
   },
   {
     jurisdiction: 'US',
@@ -120,6 +124,7 @@ export const USPTO_DEADLINE_RULES: JurisdictionDeadlineRule[] = [
     extension_period_months: 1,
     extension_requires_fee: true,
     absolute_max_months: 6,
+    rule_reference: '37 CFR 1.142; MPEP 818',
   },
 ];
 

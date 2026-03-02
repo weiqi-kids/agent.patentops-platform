@@ -1,12 +1,12 @@
 {
   "_metadata": {
-    "schema_version": "1.0",
+    "schema_version": "2.0",
     "last_reviewed_at": "2026-03-02T00:00:00Z",
-    "description": "RBAC Role Matrix — defines permissions for each role in the PatentOps platform"
+    "description": "RBAC Role Matrix — patent prosecution workflow roles and permissions"
   },
   "roles": {
     "client": {
-      "description": "External client / patent applicant",
+      "description": "External client — the entity commissioning the patent work",
       "permissions": {
         "case": ["view_own"],
         "claim": ["view"],
@@ -14,6 +14,9 @@
         "deadline": ["view_own"],
         "office_action": ["view"],
         "conflict_check": [],
+        "ids": ["view_own"],
+        "fee": ["view_own"],
+        "patent_family": ["view_own"],
         "admin": [],
         "ai": []
       },
@@ -21,8 +24,48 @@
       "can_mark_final": false,
       "can_file": false
     },
+    "inventor": {
+      "description": "Named inventor on the patent application — signs oath/declaration, provides technical input",
+      "permissions": {
+        "case": ["view_own"],
+        "claim": ["view", "comment"],
+        "document": ["view_own", "sign_declaration"],
+        "deadline": ["view_own"],
+        "office_action": ["view"],
+        "conflict_check": [],
+        "ids": ["view_own"],
+        "fee": [],
+        "patent_family": ["view_own"],
+        "admin": [],
+        "ai": []
+      },
+      "state_transitions_allowed": [],
+      "can_mark_final": false,
+      "can_file": false
+    },
+    "paralegal": {
+      "description": "Patent paralegal / docketing clerk — manages deadlines, case administration, fee tracking",
+      "permissions": {
+        "case": ["view_assigned", "update_administrative"],
+        "claim": ["view"],
+        "document": ["view", "generate_draft"],
+        "deadline": ["view_all", "create", "complete", "extend"],
+        "office_action": ["view", "log_receipt"],
+        "conflict_check": ["view", "initiate"],
+        "ids": ["view", "prepare_draft"],
+        "fee": ["view_all", "create", "record_payment"],
+        "patent_family": ["view", "update_links"],
+        "admin": [],
+        "ai": []
+      },
+      "state_transitions_allowed": [
+        "PENDING->OA_RECEIVED"
+      ],
+      "can_mark_final": false,
+      "can_file": false
+    },
     "associate": {
-      "description": "Junior patent professional / patent agent",
+      "description": "Junior patent professional / patent agent — drafts claims, analyzes OAs",
       "permissions": {
         "case": ["view_assigned", "update_assigned"],
         "claim": ["view", "create_draft", "edit_draft"],
@@ -30,6 +73,9 @@
         "deadline": ["view_assigned", "complete"],
         "office_action": ["view", "analyze", "draft_response"],
         "conflict_check": ["view"],
+        "ids": ["view", "prepare_draft", "add_reference"],
+        "fee": ["view_assigned"],
+        "patent_family": ["view"],
         "admin": [],
         "ai": ["invoke_draft", "invoke_analysis"]
       },
@@ -44,7 +90,7 @@
       "can_file": false
     },
     "reviewer": {
-      "description": "Senior patent attorney / licensed reviewer",
+      "description": "Senior patent attorney / licensed reviewer — reviews and approves all work product",
       "permissions": {
         "case": ["view_all", "update_all"],
         "claim": ["view", "create_draft", "edit_draft", "approve", "reject"],
@@ -52,6 +98,9 @@
         "deadline": ["view_all", "complete", "waive", "extend"],
         "office_action": ["view", "analyze", "draft_response", "approve_response"],
         "conflict_check": ["view", "review"],
+        "ids": ["view", "prepare_draft", "add_reference", "approve"],
+        "fee": ["view_all", "approve_payment"],
+        "patent_family": ["view", "update_links", "approve_priority_claim"],
         "admin": [],
         "ai": ["invoke_draft", "invoke_analysis"]
       },
@@ -66,7 +115,7 @@
       "can_file": true
     },
     "partner": {
-      "description": "Managing partner / firm principal",
+      "description": "Managing partner / firm principal — ultimate authority on all case decisions",
       "permissions": {
         "case": ["view_all", "update_all", "create", "close", "withdraw"],
         "claim": ["view", "create_draft", "edit_draft", "approve", "reject"],
@@ -74,6 +123,9 @@
         "deadline": ["view_all", "complete", "waive", "extend"],
         "office_action": ["view", "analyze", "draft_response", "approve_response", "file_response"],
         "conflict_check": ["view", "review", "override"],
+        "ids": ["view", "prepare_draft", "add_reference", "approve", "file"],
+        "fee": ["view_all", "approve_payment", "waive"],
+        "patent_family": ["view", "update_links", "approve_priority_claim"],
         "admin": ["manage_users", "view_billing", "export_audit"],
         "ai": ["invoke_draft", "invoke_analysis", "configure"]
       },
@@ -81,8 +133,27 @@
       "can_mark_final": true,
       "can_file": true
     },
+    "foreign_associate": {
+      "description": "Foreign patent agent/attorney — handles jurisdiction-specific filing in other countries",
+      "permissions": {
+        "case": ["view_assigned"],
+        "claim": ["view", "comment"],
+        "document": ["view_assigned", "upload_foreign_filing"],
+        "deadline": ["view_assigned"],
+        "office_action": ["view_assigned", "upload_foreign_oa"],
+        "conflict_check": [],
+        "ids": ["view_assigned"],
+        "fee": ["view_assigned"],
+        "patent_family": ["view_assigned"],
+        "admin": [],
+        "ai": []
+      },
+      "state_transitions_allowed": [],
+      "can_mark_final": false,
+      "can_file": false
+    },
     "admin": {
-      "description": "Platform administrator (non-legal, technical role)",
+      "description": "Platform administrator — technical operations, no legal authority",
       "permissions": {
         "case": ["view_all"],
         "claim": ["view"],
@@ -90,6 +161,9 @@
         "deadline": ["view_all"],
         "office_action": ["view"],
         "conflict_check": ["view"],
+        "ids": ["view"],
+        "fee": ["view_all"],
+        "patent_family": ["view"],
         "admin": ["manage_users", "manage_tenants", "view_billing", "configure_system", "export_audit"],
         "ai": ["configure"]
       },
@@ -98,7 +172,7 @@
       "can_file": false
     },
     "system": {
-      "description": "Automated system actor (deadline engine, event projector, AI sidecar)",
+      "description": "Automated system actor — deadline engine, event projector, AI sidecar",
       "permissions": {
         "case": ["view_all", "update_status"],
         "claim": [],
@@ -106,6 +180,9 @@
         "deadline": ["create", "update_status", "send_warning"],
         "office_action": ["update_status"],
         "conflict_check": [],
+        "ids": [],
+        "fee": ["create_deadline"],
+        "patent_family": [],
         "admin": [],
         "ai": ["invoke_draft", "invoke_analysis"]
       },
