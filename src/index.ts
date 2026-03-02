@@ -9,7 +9,7 @@ import { createApp } from './config/app.js';
 
 async function main(): Promise<void> {
   const app = await createApp();
-  const port = parseInt(process.env['PORT'] ?? '3000', 10);
+  const port = parseInt(process.env['PORT'] ?? '7426', 10);
   const host = '0.0.0.0';
 
   try {
