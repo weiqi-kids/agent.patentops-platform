@@ -23,6 +23,10 @@ import type {
   CloseCaseInput,
 } from '../schemas/case-schemas.js';
 import { CaseAggregate } from '../../domain/case/case-aggregate.js';
+import {
+  FilingPreChecker,
+} from '../../domain/case/filing-pre-check.js';
+import type { FiledDocumentRecord } from '../../domain/case/filing-pre-check.js';
 import type { EventStore } from '../../infrastructure/event-store/types.js';
 import type {
   CaseId,
@@ -30,6 +34,8 @@ import type {
   CausationId,
   CaseStatus,
   CaseCloseReason,
+  DocumentType,
+  DocumentStatus,
 } from '../../shared/types/index.js';
 
 export async function caseRoutes(
@@ -113,6 +119,50 @@ export async function caseRoutes(
 
     const correlationId = ulid() as CorrelationId;
     const causationId = ulid() as CausationId;
+
+    // Filing pre-check: validate document completeness when transitioning to FILING
+    if (input.to_state === 'FILING' && aggregate.currentState!.status === 'REVIEW') {
+      const checker = new FilingPreChecker();
+      const docEvents = existingEvents.filter(
+        (e) => e.event_type === 'DOCUMENT_GENERATED' || e.event_type === 'DOCUMENT_FINALIZED',
+      );
+
+      // Build document records from events
+      const docMap = new Map<string, FiledDocumentRecord>();
+      for (const e of docEvents) {
+        const p = e.payload as { document_id: string; document_type?: DocumentType; content_hash?: string; from_status?: DocumentStatus; to_status?: string };
+        if (e.event_type === 'DOCUMENT_GENERATED') {
+          docMap.set(p.document_id, {
+            document_type: p.document_type!,
+            status: 'draft',
+            content_hash: p.content_hash ?? '',
+          });
+        }
+        if (e.event_type === 'DOCUMENT_FINALIZED') {
+          const existing = docMap.get(p.document_id);
+          if (existing) {
+            existing.status = 'final';
+            if (p.content_hash) existing.content_hash = p.content_hash;
+          }
+        }
+      }
+
+      const checkResult = checker.check(
+        caseId,
+        request.tenant_id,
+        aggregate.currentState!.patent_type,
+        aggregate.currentState!.jurisdiction,
+        Array.from(docMap.values()),
+      );
+
+      if (!checkResult.is_ready) {
+        return reply.status(422).send({
+          error: 'Filing pre-check failed',
+          missing_documents: checkResult.missing_documents,
+          warnings: checkResult.warnings,
+        });
+      }
+    }
 
     try {
       aggregate.changeStatus({
